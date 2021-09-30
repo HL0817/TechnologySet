@@ -14,7 +14,7 @@
 
 ## 通用
 光照探针存储烘焙过程中生成的间接光信息，做为补充光源为场景的的对象提供光照效果，减小游戏运行时处理光照的压力。
-
+![light_probe_generality](./images/light_probe_generality.jpg)
 ### 作用
 光照探针主要有两个用途：
 + 为场景中的动态对象提供提前生成的间接光：
@@ -63,9 +63,69 @@
 
 本节将会讨论球谐在光照探针数据的基本使用和探针数据的插值这两个方面，更多的实现内容将在[细节](#细节)章节中呈现出来。
 
-##### 光照探针中的球谐基础
+##### 光照探针中的正交基础
+任何一个球面函数 $f(\theta,\varphi)$ 可以用正交归一化的球函数 $Y_l^m(\theta, \varphi)$ 进行展开，这种类似于傅里叶展开，被称为广义傅里叶展开
+> $\LARGE{ f(\theta,\varphi) = \displaystyle\sum_{l=0}^\infty \displaystyle\sum_{m=-l}^l C_l^m Y_l^m(\theta,\varphi) }$
+
+通俗的理解上面的展开：**目标函数可以通过广义傅里叶展开以球谐函数表示出来，即使用球谐函数模拟目标函数**
+我们重点理解其中三个部分： $f(\theta,\varphi)$ 、 $C_l^m$ 和 $Y_l^m(\theta,\varphi)$
++ $f(\theta,\varphi)$
+    我们的目标函数，一般是复杂且难以表示的函数，用来被模拟的对象
++ $C_l^m$
+    就是通常意义上的球谐系数，我们可以只记录系数来表示模拟结果
++ $Y_l^m(\theta,\varphi)$
+    正交基，用来模拟其他函数的基函数，通过调整系数来影响模拟的结果
+    >$ Y_l^m(\theta,\varphi) = 
+    >\begin{cases}
+    >   \sqrt{2}K_l^m\cos(m\varphi)P_l^m(\cos\theta) &\text{if } m>0 \\
+    >   \sqrt{2}K_l^m\sin(-m\varphi)P_l^{-m}(\cos\theta) &\text{if } m<0 \\
+    >   K_l^0P_l^{-m}(\cos\theta) &\text{if } m=0
+    >\end{cases} $
+    >$P_l^m(x)$ 是 $l$ 次 $m$ 阶连带勒让德函数，具有递归关系，可由计算机实现计算
+    >这里我们可以把正交基当做已知条件来看待
+
+既然是广义傅里叶展开，那么我们看一下他的展开式子：
+> $ \{Y_l^m(\theta,\varphi)\} = \{ Y_0^0, Y_1^-1, Y_1^0, Y_1^1,\cdot\cdot\cdot \} $
+>给定展开次数 $n$，得到球谐函数组的个数为 $S = 1 + 3 + 5 + \cdot\cdot\cdot + 2n-1$
+>广义傅里叶系数相当于这样一个排列：$C_0^0, C_1^-1, C_1^0, C_1^1,\cdot\cdot\cdot$
+
+我们把它写得简略一点可以得到：$f(\theta,\varphi) \approx aY_0^0 + bY_1^-1 + cY_1^0 + dY_1^1 + \cdot\cdot\cdot$
+看一下模拟效果：
+![广义傅里叶展开-球谐模拟](./images/广义傅里叶展开-球谐模拟.jpg)
+现在让我们来认识一下探针数据形成的过程（烘焙计算的相关内容，这里简略说一下）：
++ 烘焙时我们使用蒙特卡洛采样（Monte Carlo Sampling）计算特定点的辐照度
++ 在球体上（或者光照贴图的半球）生成随机光线
++ 把光线方向上的辐照度投影到正交基上，得到球谐系数（生成系数的过程被称为投影）
+
+至此，我们得到了一组球谐系数，用来表示辐照度函数。
+现在我们就可以使用球谐系数和正交基来求辐照度函数的近似结果了：
+![reconstructing_SH](./images/reconstructing_SH.jpg)
+在着色阶段，我们根据方向（点的法线）解算就可以得到该点的辐照度了。
 
 ##### 常见探针插值
+探针数据是由球谐系数和正交基线性组合而成的（球谐系数在空间中是线性分布的），对探针进行插值可以被表示为对球谐系数进行插值：
+![SH_interpolation](./images/SH_interpolation.jpg)
+这就导致一个问题，因为线性关系，探针数据所表示的间接光被认为是线性变化的光，那么用探针来模拟非线性衰弱的直接光（尤其是点光源这种），效果非常差
+
+交代过基础背景之后，让我们来看一下简单的插值策略：
++ Single Probe
+    直接使用这个探针，不插值
+    ![single_probe_interpolation](./images/single_probe_interpolation.jpg)
++ 1D Interpolation
+    两个探针形成一个线段，按距离做线性插值
+    ![1D_interpolation](./images/1D_interpolation.jpg)
++ 2D Interpolation
+    三个探针为一组，三角形就按照重心坐标插值
+    ![2D_interpolation](./images/2D_interpolation.jpg)
++ 3D Interpolation
+    4个探针组合为四面体，也按照重心坐标插值
+    ![3D_interpolation](./images/3D_interpolation.jpg)
+
+三角形和四面体的重心坐标插值如下（简单过一下，单独的插值章节再展开）：
++ 三角形重心坐标插值
+    ![triangular_interpolation](./images/triangular_interpolation.jpg)
++ 四面体重心坐标插值
+    ![tetrahedron_interpolation](./images/tetrahedron_interpolation.jpg)
 
 ## 细节
 ### Visibility
