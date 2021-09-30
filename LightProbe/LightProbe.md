@@ -63,7 +63,7 @@
 
 本节将会讨论球谐在光照探针数据的基本使用和探针数据的插值这两个方面，更多的实现内容将在[细节](#细节)章节中呈现出来。
 
-##### 光照探针中的正交基础
+##### 光照探针中的球谐基础
 任何一个球面函数 $f(\theta,\varphi)$ 可以用正交归一化的球函数 $Y_l^m(\theta, \varphi)$ 进行展开，这种类似于傅里叶展开，被称为广义傅里叶展开
 > $\LARGE{ f(\theta,\varphi) = \displaystyle\sum_{l=0}^\infty \displaystyle\sum_{m=-l}^l C_l^m Y_l^m(\theta,\varphi) }$
 
