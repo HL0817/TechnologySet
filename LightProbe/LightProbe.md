@@ -1,4 +1,5 @@
 # LightProbe
+If you can not render Mathematical formula, please read this [image_LightProbe_md_to_png](./LightProbe_md_to_png.png)
 
 ## 目录
 + [通用](#通用)
