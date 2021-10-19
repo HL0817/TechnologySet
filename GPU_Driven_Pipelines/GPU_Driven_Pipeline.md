@@ -98,9 +98,19 @@ Mesh Cluster，网格块，指把一个模型以 cluster 为单位的进行细�
     *这里指出了为什么不能直接展开成 Cluster列表，而是要通过 Chunk做中转。一个 mesh可以分成的 Cluster太多（0-1000~），如果直接这样去让 GPU展开，那么 Cluster的数量对于 GPU的 wavefront来说，不能使线程间达到大致平衡（不同线程间差距过大，无法进行 GPU优化）。这里把中间层级约束到了 Chunk，最大可以包含 64个 Cluster。*
 + Cluster Culling
     ![cluster_culling](./images/cluster_culling.png)
-    根据 Cluster的信息（变换、边界等）做剔除（视锥和遮挡剔除），然后把剩下的 Cluster排列起来生成 Indexbuffer，在生成过程中计算每个三角形的背面剔除掩码并记录到 Indexbuffer对应的三角形的信息里面。
-    *这里的 Triangle Mask是三角形背面剔除的采样结果，我们预先将三角形各个方向的可见性做了烘焙处理，存进 Cluster的信息里面，这里计算当前这个方向是否为背面，然后写入掩码即可。*
+    根据 Cluster的信息（变换、边界等）做剔除（视锥和遮挡剔除），然后为每个 Cluster计算三角形背面剔除掩码（采样预先烘焙好的根据方向计算的三角形背面遮挡数据），把 Cluster剔除信息和三角形背面剔除掩码传递到下一个阶段，做 indexbuffer 压缩。
+    *这里的 Triangle Mask是三角形背面剔除的采样结果，我们预先将三角形各个方向的可见性做了烘焙处理，存进 Cluster的信息里面，这里计算当前这个方向是否为背面，然后写入掩码即可。后文会展示如何烘焙三角形背面数据。*
 + Index Buffer Compaction
+    ![index_buffer_compaction](./images/index_buffer_compaction.png)
+    Indexbuffer 是跟着 Drawcall 一起传入 GPU 中的，它记录了所有实例的下标，这里我们根据 Cluster剔除信息和三角形背面剔除掩码将已经被剔除的 Cluster的下标以及背面剔除的三角形的下标给删除掉，把 Indexbuffer 压缩到只含有需要绘制的三角形下标。
+    这里有两个点比较特殊：
+    + 被压缩的 Indexbuffer 比较小（小于8mb），这样会让我们不能一次性处理非常大的 renderpass，我们必须把它分成多个 pass 来进行。这意味着，Indexbuffer 的压缩和 multi-draw 是交替进行的，不会发生所有的 Indexbuffer压缩完成才进行绘制。
+    + 一个 wavefront 只会处理一个 Cluster 的 Indexbuffer 压缩计算，每个线程也就只能处理一个单独的三角形，不会和其他 wavefront 和线程有耦合。
 + Multi-Draw
+    ![multi_draw](./images/multi_draw.png)
+    这里使用 MultiDrawIndexInstancedIndirect 来绘制前几个步骤生成的 drawcall组。
 
 ### Discussion
+优劣、以及结合项目谈实际
+
+个人看法：
