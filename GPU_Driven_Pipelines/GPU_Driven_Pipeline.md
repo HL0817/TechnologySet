@@ -6,20 +6,15 @@
     + Topic
     + Discussion
 + Rendering pipeline
-    + 管线步骤
+    + Topic
+    + Discussion
 + Static Triangle Backface Culling
     + 原理
     + 结果
-+ Occlusion Depth Generation
-    + 流程
-    + 结果
-+ Virtual Texturing
-    + 简介
-    + 在管线中的运用
-    + 优劣
-+ Two-Phase Occlusion Culling
-    + 原理
-    + 结果
++ GPU Occlusion Culling
+    + Occlusion Depth Generation
+    + Two-Phase Occlusion Culling
++ Camera Depth Reprojection
 + 总结
     + GPU Driven Pipeline总结
     + 个人感受
@@ -111,6 +106,113 @@ Mesh Cluster，网格块，指把一个模型以 cluster 为单位的进行细�
     这里使用 MultiDrawIndexInstancedIndirect 来绘制前几个步骤生成的 drawcall组。
 
 ### Discussion
-优劣、以及结合项目谈实际
+优点：
++ 将模型从 Mesh 的粒度进一步细分为 Cluster，为管线其他阶段提高效率
++ 非常巧妙的把提高精度（比如绘制粒度更小，剔除粒度更小，加载粒度更小等等），提前处理模型，生成 Cluster，把提升精度的消耗放到了 Runtime 之外
++ 更加细致的 GPU剔除，剔除效率提高，能剔除掉更多的东西，也给大模型的部分遮挡，给出了一个较好的解决办法
++ CPU 与 GPU 通信的次数和内容大小都降低了，CPU 的很多工作都挪到了 GPU去做，变相的释放了 CPU性能，去做游戏需要的逻辑处理，以及物理、动画、模拟都可以重新进行优化
++ 应该还有一些细节，我没记录下来，也没能想到（如果想到了再补充）
+
+缺点：
++ 核心就是 Cluster，现在把 Mesh细分为 Cluster，就要想到这么几个问题，如何进行细分（不同顶点数的 Cluster细分策略不一样，顶点数应该这么确认，边缘如何处理，不足数量时新增顶点的策略），Cluster 该如何进行管理等等
++ GPU Driven 管线必须和当前的管线并行了，不适合共用（这里指引擎需要有两套甚至多套不同的管线），现行的管线和 GPU 管线差异挺大，适配是个问题
++ GPU 管线对 GPU 的负担具体有多大，尽管当前30系N卡和60系A卡挺强的，但是主流游戏市场主流的显卡仍然是1060级别
++ 感觉 GPU Driven Pipeline 并没有什么特别的缺点，上面说的这些问题，仅仅是我考虑实际生产环境，没有多余人力物力来推动这个新管线落地而想到的一些困难点。如果有专门的人或者小团队去推的话，应该也不算什么大问题。可能游戏项目实际用起来这个管线还要一段时间，稳定性和泛用性都需要花时间去打磨，引擎维护也需要考虑人力。
++ 写代码比较繁琐，GPU 侧的代码量大增（感觉），本来管线就复杂，还要在 shader 里面写，可能就更恼火了
++ 定位问题同样是个大坑，手段不多，而且还麻烦，转到多物体的 GPU 管线绘制，复杂程度直线上升
 
 个人看法：
++ GPU Driven Pipeline 优点非常明显，且这两年技术和条件都相对成熟一些了，适合作为后续个人技术积累和研究的方向
++ 如果不打算新增这个管线，也应该在当前管线上尽可能的使用 GPU管线的一些功能（可以魔改使用），算是预研 GPU管线，记录一些痛点和难点，为后续接入积累经验
+
+## Static Triangle Backface Culling
+这一节详细说一下为三角形烘焙背面剔除的可见性数据的过程
+*分享中讲了 ACU 的做法和结果，我这里讲一下本质的原理，以及他们是如何做简化和优化的*
+
+### 原理
+![triangle_backface_culling_spheremap](./images/triangle_backface_culling_spheremap.png)
+*找的网图，后面有时间可以重新画一个贴合场景的图*
+#### 烘焙计算的原理
++ 原点表示三角形的位置
++ 球上任意一点和原点的连线表示相机的朝向（lookat）
++ 这个方向上是否看到三角形背面和球面的坐标做一一对应，得到球面函数：$
+f(x, y, z) =
+\begin{cases}
+   1 &\text{if not backface} \\
+   0 &\text{if backface}
+\end{cases}$
+
+这些数据我们在烘焙阶段就计算生成好了，在实际三角形背面剔除计算时，直接根据三角形的中心坐标和相机的朝向去获取结果即可
+
+#### 简化与优化
++ 我们不必去存球面关系，而是直接将计算出来的值映射到 cubemap 中，方便存储、加载和采样
++ ACU 做了一个极致的简化，将球面表示的任意方向简化为立方体六个面的朝向，我们只计算存储 $x, -x, y, -y, z, -z$ 这6个方向上，三角形的背面可见性
+    + 首先是数据量的问题，每个三角形只有6个0或1的数据，那么只有6个bit就能表示一个三角形（ACU使用64个三角形，那么对于每个 Cluster来说，最多64*6 bit的数据量）
+    + 其次是计算的复杂度，在烘焙过程中，只考虑6个方向，极大的简化计算和存储
+    + 只有6个bit来表示任意方向上的三角形可见性，那么结果必然不会很准确。
+    这里采用了保守剔除策略：用最少的消耗，在准确的条件下，剔除不需要的三角形，提升效率
+        对于任意方向来说，6bit的 cubemap采样出的结果：$
+        result = \begin{cases}
+            1 &\text{可能不可见} \\
+            0 &\text{一定不可见}
+        \end{cases}$
+
+我们剔除那些只用6个bit就能区分出来的不可见三角形（背面表示的三角形），能剔除一些就是赚的，如果提升烘焙数据的精度，那么可能得不偿失。
+
+### 结果
+看一下 ACU 的三角形背面剔除的结果：
++ 一个三角形6个bit来存储该三角形的背面可见性，cubemap每个面只有一个像素，那么对于一个 Cluster来说，只会多 64 * 6 bits（ACU 扩展 Cluster的大小到了64个三角形）
++ 10%-30%的三角形被剔除
+
+## GPU Occlusion Culling
+分享中提到了两种 GPU 剔除策略
++ ACU 使用的是 Occlusion Depth Generation，主要分享遮挡深度的生成
++ RedLynx 使用的是 Two-Phase Occlusion Culling，主要分享遮挡剔除的过程
+
+### Occlusion Depth Generation
+#### 基本实现思路
++ Depth pre-pass，我们单独创建一个预计算 pass来生成遮挡深度图
+    + 在这个 pass生成的遮挡深度图可以被后面 High-Z 和 Early-Z 使用
++ 选取一些好的遮挡物来生成本帧的深度遮挡图
+    ![depth_for_selected_occluders](./images/depth_for_selected_occluders.png)
+    + 有很多策略来选取好的遮挡物，ACU 这里采用最简单的基于距离的选择策略（因为时间原因，没有过多测试）
++ 将本帧深度遮挡图降采样到 $512 \times 256$
++ 上一帧的深度图重投影（reprojection）到原来的 $\dfrac {1} {16}$分辨率
+    ![reprojection_of_last_frame_depth](./images/reprojection_of_last_frame_depth.png)
+    + 不知道是当前 pass做重投影；还是之前就做好了重投影，这里直接使用
+    + 为什么做重投影：降低上一帧的深度的分辨率，模糊上一帧的深度信息，这一帧去大概数据，抛弃完全准确的上一帧数据，降低计算量，忽略上一帧的某些准确信息（减少我们对这种准确而跟本帧冲突的数据）
++ 将本帧遮挡深度图和上一帧的重投影遮挡深度图做一个合并
+    + 为什么做合并，本帧遮挡深度是选择部分模型来做遮挡物生成深度图，很可能旋转不连续有空洞产生（镜头的边缘也容易产生）
+        ![holes_depth_for_selected_occluders](./images/holes_depth_for_selected_occluders.png)
+    + 我们使用上一帧的深度重投影来填满这些空洞的地方
+    + 上一帧的大型移动遮挡物可能会产生错误遮挡，我们会在重投影的过程中去掉相机附近遮挡来避免这种情况的发生
++ 我们把这个生成的遮挡深度图按深度做一个分级，作为后面 GPU剔除的依据（这里做mipmap？个人不确定）
+
+#### 生成效率
+以 ACU 的典型场景为例，展示整个 pass的耗时
+![typical_scene](./images/typical_scene.png)
++ 300 selected occluders 生成本帧遮挡深度图 **~600us**
++ 本帧深度遮挡图降采样到 $512 \times 256$ **100us**
++ 本帧深度遮挡图与上帧深度重投影图进行合并 **50us**
++ 根据合并图生成遮挡深度分级图 **50us**
+
+可以看到这个 pass的主要步骤耗时不超过**1ms**
+
+#### Shadow Occlusion Depth Generation
+[Shadow Occlusion Depth Generation](#shadow-occlusion-depth-generation) 是 Occlusion Depth Generation 在阴影方面的应用，在后面展开
+
+### Two-Phase Occlusion Culling
+#### 基本思路
+#### 执行流程
+#### 结果
+
+### 个人理解
+
+## Shadow Occlusion Depth Generation
+#### Camera Depth Reprojection
+
+
+## 总结
+*研讨会总结*
+### GPU Driven Pipeline总结
+### 个人感受
