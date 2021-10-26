@@ -177,8 +177,8 @@ f(x, y, z) =
     ![depth_for_selected_occluders](./images/depth_for_selected_occluders.png)
     + 有很多策略来选取好的遮挡物，ACU 这里采用最简单的基于距离的选择策略（因为时间原因，没有过多测试）
 + 将本帧深度遮挡图降采样到 $512 \times 256$
+    ![downsample_depth](./images/downsample_depth.png)
 + 上一帧的深度图重投影（reprojection）到原来的 $\dfrac {1} {16}$分辨率
-    ![reprojection_of_last_frame_depth](./images/reprojection_of_last_frame_depth.png)
     + 不知道是当前 pass做重投影；还是之前就做好了重投影，这里直接使用
     + 为什么做重投影：降低上一帧的深度的分辨率，模糊上一帧的深度信息，这一帧去大概数据，抛弃完全准确的上一帧数据，降低计算量，忽略上一帧的某些准确信息（减少我们对这种准确而跟本帧冲突的数据）
 + 将本帧遮挡深度图和上一帧的重投影遮挡深度图做一个合并
@@ -186,7 +186,8 @@ f(x, y, z) =
         ![holes_depth_for_selected_occluders](./images/holes_depth_for_selected_occluders.png)
     + 我们使用上一帧的深度重投影来填满这些空洞的地方
     + 上一帧的大型移动遮挡物可能会产生错误遮挡，我们会在重投影的过程中去掉相机附近遮挡来避免这种情况的发生
-+ 我们把这个生成的遮挡深度图按深度做一个分级，作为后面 GPU剔除的依据（这里做mipmap？个人不确定）
++ 我们把这个生成的遮挡深度图按深度做一个分级(Depth Hierarchy)，作为后面 GPU剔除的依据（这里做mipmap？个人不确定）
+    ![Hi_Z_depth](./images/Hi_Z_depth.png)
 
 #### 生成效率
 以 ACU 的典型场景为例，展示整个 pass的耗时
@@ -203,10 +204,37 @@ f(x, y, z) =
 
 ### Two-Phase Occlusion Culling
 #### 基本思路
++ 只有一个遮挡剔除 pass
+    + ACU 有两个 pass，prepass 生成遮挡深度，剔除 pass 做实际的剔除
+    + RedLynx 的场景更多由小物体组成，不会有单个物体的大面积遮挡
+    ![RedLynx_occlusion_scene](./images/RedLynx_occlusion_scene.png)
++ 基于 G-Buffer 深度数据生成一个遮挡深度锥体
+    ![depth_pyramid](./images/depth_pyramid.png)
++ 深度遮挡锥是由 GCN HTILE min/max depth buffer 生成出来的
+    + 比全分辨率递归采样生成快12倍
+    + 这里没听说过 GCN HTILE min/max depth buffer，所以不会
++ 对遮挡物体做遮挡测试
+    + O(1) 级别的测试
+    + 使用 gather4 指令，一次测试把4个遮挡物合在一起做遮挡剔除
 #### 执行流程
-#### 结果
+让我们看一下具体的执行流程：
+![two_phase_occlusion_culling](./images/two_phase_occlusion_culling.png)
++ 根据上一帧的遮挡深度锥体（depth pyramid）进行遮挡剔除，将没有被剔除的物体绘制出来
+    + 这里的遮挡剔除分为两步
+        + 粗粒度的视口剔除（viewport culling）和遮挡剔除，也就是以 object 为剔除粒度
+        + 细粒度的视口剔除、背面剔除（猜测应该跟ACU的三角形背面剔除一致）和遮挡剔除，剔除粒度为 Cluster
+    + 将没有被剔除的物体绘制出来，因为是基于上一帧的遮挡深度，所以很多时候会有错误，分两种情况
+        + 剔除了不该剔除的 object & Cluster，这会在接下来的步骤重新处理
+        + 该剔除的没有剔除，两帧之间的差异不大，这样的该剔除而没有剔除的物体直接忽略，让它绘制出来（保守剔除策略的体现之一，该剔除而没有剔除的，直接不做处理）
++ 根据这一帧的数据（G-Buffer Depth Data）更新遮挡深度锥体
++ 根据更新后的遮挡深度锥体对被剔除掉物体重新做遮挡剔除，将没有被剔除的物体绘制出来
+    + 这里的遮挡剔除对象是第一步过程中，通过了视口剔除和背面剔除没有通过遮挡剔除的物体
+        + 没通过背面剔除的物体，在这里也不会通过背面剔除，所以被去掉了，但是视口剔除也不用管吗（如果快速移动镜头，这里会有问题吧？）
 
 ### 个人理解
+当前的 GPU剔除，如果用本帧的数据就会有很大的剔除压力，非常耗时；但使用上一帧的遮挡深度，难以避免的情况就是剔除错误（快速晃动镜头导致两帧差异过大，如果物体恰好是由小物体拼成的，就容易出问题）。只有一些辅助手段去缓解或规避这样的情况，一个是给场景做一个背景包围盒（场景色调相似，给背景上一个差不多的颜色，就算剔错了，把背景盒画出来也不算很容易露馅）；二是近处物体不做剔除（优先把近处视野内的物体给保住，远处的物体剔除错误也不容易发现）。
+然而现在把 GPU剔除的的数据处理放到了 GPU侧，让我们非常从容的在 GPU处理后的数据基础上可以做进一步处理。
+我们可以使用当前帧的实时遮挡深度了，尽管也需要对当前帧的遮挡剔除做优化，ACU 的优化是只选取部分物体做遮挡深度图（基于距离），RedLynx的优化是只对被上一帧数据剔除掉的小部分物体做遮挡剔除。
 
 ## Shadow Occlusion Depth Generation
 #### Camera Depth Reprojection
