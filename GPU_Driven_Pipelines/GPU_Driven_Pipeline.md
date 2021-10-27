@@ -186,7 +186,7 @@ f(x, y, z) =
         ![holes_depth_for_selected_occluders](./images/holes_depth_for_selected_occluders.png)
     + 我们使用上一帧的深度重投影来填满这些空洞的地方
     + 上一帧的大型移动遮挡物可能会产生错误遮挡，我们会在重投影的过程中去掉相机附近遮挡来避免这种情况的发生
-+ 我们把这个生成的遮挡深度图按深度做一个分级(Depth Hierarchy)，作为后面 GPU剔除的依据（这里做mipmap？个人不确定）
++ 我们把这个生成的遮挡深度图做一个分级(Depth Hierarchy)，作为后面 GPU剔除的依据（这里做mipmap？个人不确定）
     ![Hi_Z_depth](./images/Hi_Z_depth.png)
 
 #### 生成效率
@@ -237,10 +237,41 @@ f(x, y, z) =
 我们可以使用当前帧的实时遮挡深度了，尽管也需要对当前帧的遮挡剔除做优化，ACU 的优化是只选取部分物体做遮挡深度图（基于距离），RedLynx的优化是只对被上一帧数据剔除掉的小部分物体做遮挡剔除。
 
 ## Shadow Occlusion Depth Generation
-#### Camera Depth Reprojection
+为每个级联生成 $64 \times 64$ 的低分辨率级联阴影贴图
++ Camera depth reprojection 生成遮挡深度 **~70us**
+    + 重投影相机深度内的光源空间可能产生的阴影关系，由此生成阴影遮挡深度
+    + 细节放到[Camera Dpeth Reprojection](#camera-depth-reprojection)中讨论
+    ![depth_for_shadowmap](./images/depth_for_shadowmap.png)
++ 当前帧的阴影遮挡深度图与上一帧重投影低分辨深度图做合并
+    + 大型快速移动的遮挡物可能会在这里造成错误（ACU 中并没有类似的遮挡物）
+    ![combine_depthshadowmap_with_last_frame](./images/combine_depthshadowmap_with_last_frame.png)
++ 把这个生成的阴影遮挡深度图做一个分级(Depth Hierarchy)，作为后面 GPU剔除的依据（这里做mipmap？个人不确定）
+    + 我不清楚这里为什么要做分级
+    ![depthshadowmap_hierarchy](./images/depthshadowmap_hierarchy.png)
 
+#### Camera Depth Reprojection
+相机深度的光源空间重投影，目的是为了去掉被遮挡物的深度关系，后面在绘制阴影的时候并不关心这些被遮挡的物体是否处于阴影中
++ 我们不关注相机之外的对象，因此只会对视锥体内的对象做处理
+    ![shadow_depth_in_frustum](./images/shadow_depth_in_frustum.png)
+    红色的线是级联的范围
++ 我们也不关注被遮挡的对象，因此去掉被遮挡的对象
+    ![shadow_depth_occlusion_cull](./images/shadow_depth_occlusion_cull.png)
++ 最终我们获得了视锥体内不被遮挡的对象的深度关系
+    ![shadow_depth_in_frustum_without_occlusion](./images/shadow_depth_in_frustum_without_occlusion.png)
+    黄色区域就是相机深度内的遮挡关系，但是我们只关注当前级联内的物体，所以绿色块就是当前级联内的阴影最大深度
+
+#### 个人理解
+深度贴图的生成也挺耗时的，特别是模型很多的时候，既然剔除都放到了 GPU管线中，那么顺便给深度贴图的生成过程做一些优化也是顺势而为了。尽量剔除不必要的遮挡关系，只保留我们实际渲染区域的深度关系，降低深度贴图的消耗。
 
 ## 总结
 *研讨会总结*
 ### GPU Driven Pipeline总结
+世界很大，但是我们的眼睛并不能装下所有的东西。因此，我们的屏幕不必要画出所有世界空间的物体。
++ 尽量做更多的剔除工作
+    + 只关注我们真正需要绘制的区域的对象及相关的阴影关系
+    + 提高剔除效率，细化剔除粒度
++ 为了让剔除的效果更好，Instance 不再适合作为最小单位
+    + 引出了新的模型表示粒度 Cluster
+    + 基于 Cluster 对剔除做了对应优化
 ### 个人感受
+使用剔除大发，节省计算量。
