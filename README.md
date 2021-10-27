@@ -6,6 +6,19 @@
 ## 导航
 
 ##### [光照探针](./LightProbe/LightProbe.md)
++ **已完成** 通用——作用 & 原理 & 实现方案
++ **未完成** 细节——Visibility & Interpolation & Light Grid
+##### [SH in Baking](./SH_in_Baking/SH_in_Baking.md)
+##### [GPU Driven Pipelines 研讨](./GPU_Driven_Pipelines/GPU_Driven_Pipelines.md)
++ **已完成** Mesh Cluster Rendering——Topic & Discussion
++ **已完成** Rendering Pipeline——Topic & Discussion
++ **已完成** Static Triangle Backface Culling——原理 & 结果
++ **已完成** GPU Occlusion Culling——Occlusion Depth Generation & Two-Phase Occlusion Culling
++ **已完成** Shadow Occlusion Depth Generation——Topic & Camera Depth Reprojection & 个人看法
++ **已完成** 总结——GPU Driven Pipeline总结 & 个人看法
+##### [SSAO](./SSAO/SSAO.md)
++ **已完成** SSAO——AO & SSAO基本原理
++ **未完成** 优化实现——HBAO & GTAO
 
 ## doc
 *这里记录一些需要的资料*

@@ -5,7 +5,7 @@
 + Mesh Cluster Rendering
     + Topic
     + Discussion
-+ Rendering pipeline
++ Rendering Pipeline
     + Topic
     + Discussion
 + Static Triangle Backface Culling
@@ -14,10 +14,13 @@
 + GPU Occlusion Culling
     + Occlusion Depth Generation
     + Two-Phase Occlusion Culling
-+ Camera Depth Reprojection
++ Shadow Occlusion Depth Generation
+    + Topic
+    + Camera Depth Reprojection
+    + 个人看法
 + 总结
     + GPU Driven Pipeline总结
-    + 个人感受
+    + 个人看法
 
 ## Mesh Cluster Rendering
 ### Topic
@@ -237,6 +240,7 @@ f(x, y, z) =
 我们可以使用当前帧的实时遮挡深度了，尽管也需要对当前帧的遮挡剔除做优化，ACU 的优化是只选取部分物体做遮挡深度图（基于距离），RedLynx的优化是只对被上一帧数据剔除掉的小部分物体做遮挡剔除。
 
 ## Shadow Occlusion Depth Generation
+### Topic
 为每个级联生成 $64 \times 64$ 的低分辨率级联阴影贴图
 + Camera depth reprojection 生成遮挡深度 **~70us**
     + 重投影相机深度内的光源空间可能产生的阴影关系，由此生成阴影遮挡深度
@@ -249,7 +253,7 @@ f(x, y, z) =
     + 我不清楚这里为什么要做分级
     ![depthshadowmap_hierarchy](./images/depthshadowmap_hierarchy.png)
 
-#### Camera Depth Reprojection
+### Camera Depth Reprojection
 相机深度的光源空间重投影，目的是为了去掉被遮挡物的深度关系，后面在绘制阴影的时候并不关心这些被遮挡的物体是否处于阴影中
 + 我们不关注相机之外的对象，因此只会对视锥体内的对象做处理
     ![shadow_depth_in_frustum](./images/shadow_depth_in_frustum.png)
@@ -260,7 +264,7 @@ f(x, y, z) =
     ![shadow_depth_in_frustum_without_occlusion](./images/shadow_depth_in_frustum_without_occlusion.png)
     黄色区域就是相机深度内的遮挡关系，但是我们只关注当前级联内的物体，所以绿色块就是当前级联内的阴影最大深度
 
-#### 个人理解
+### 个人看法
 深度贴图的生成也挺耗时的，特别是模型很多的时候，既然剔除都放到了 GPU管线中，那么顺便给深度贴图的生成过程做一些优化也是顺势而为了。尽量剔除不必要的遮挡关系，只保留我们实际渲染区域的深度关系，降低深度贴图的消耗。
 
 ## 总结
@@ -273,5 +277,5 @@ f(x, y, z) =
 + 为了让剔除的效果更好，Instance 不再适合作为最小单位
     + 引出了新的模型表示粒度 Cluster
     + 基于 Cluster 对剔除做了对应优化
-### 个人感受
+### 个人看法
 使用剔除大发，节省计算量。
