@@ -1,5 +1,6 @@
 # SH in Baking
 *球谐函数在烘焙中的应用，默认已经了解球谐的基础了，简略了解球谐基础请点击[光照探针中的球谐基础](../LightProbe/LightProbe.md)*
+*If you can not render Mathematical formula, please read this [image_SH_in_Baking_md_to_png](./image_SH_in_Baking_md_to_png.png)*
 
 ## 目录
 + 为什么选用 SH 表示
@@ -97,6 +98,7 @@ SHL1 shEvaluateDiffuseL1(vec3 p)
 ```
 我们可以看到，合并之后做乘积的因子变成了比较特殊的值`AY0 = 0.25`、`AY1 = 0.50`，这是巧合么？
 显然不是，让我们以 L1阶球谐为例，在代数来解读合并的过程
+
 球谐函数 $L(\theta, \varphi) = \displaystyle\sum_{l, m}L_{lm}Y_{lm}(\theta, \varphi)$
 
 在球面上积分有 $L_{lm} = \displaystyle\int_{\theta = 0}^{\pi}\displaystyle\int_{\varphi = 0}^{2\pi}L(\theta, \varphi)Y_{lm}(\theta, \varphi)\sin\theta,d\theta,d\varphi$
@@ -229,7 +231,3 @@ $\textcolor{green}{E_{00}} = \displaystyle\frac {1}{N} \displaystyle\sum_{i = 1}
 + 结果可能为负，因为 L1的值很是 L0的两倍
 + BRDF 里的 $\frac 1 \pi$ 我们已经在前面简化约分的时候用掉了
 + 也输出了缺少反射因子的反射光辐射值（radiance of reflected light）
-
-[Converting SH Radiance to Irradiance](https://grahamhazel.com/blog/2017/12/22/converting-sh-radiance-to-irradiance/)
-[baking artifact free lightmaps](https://ndotl.wordpress.com/2018/08/29/baking-artifact-free-lightmaps/)
-[pi or not to pi in game lighting equation](https://seblagarde.wordpress.com/2012/01/08/pi-or-not-to-pi-in-game-lighting-equation/)
