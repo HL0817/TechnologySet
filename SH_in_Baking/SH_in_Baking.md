@@ -204,6 +204,31 @@ $$
 &E_{11} = \displaystyle\frac {\pi}{N} \displaystyle\sum_{i = 1}^N L(x_i, y_i, z_i) x_i
 \end{split}
 $$
+数学推导过程到此结束
+
+现在我们来处理这个得到的结果：
++ 我们可以在其他地方约掉一些常量
+    + BRDF 中的 $1/\pi$
+    + 蒙特卡洛积分里的 $4\pi$
+
+将这些条件带入，得到我们最终简化版的 L1 SH irradiance 蒙特卡洛积分
+$\textcolor{green}{E_{00}} = \displaystyle\frac {1}{N} \displaystyle\sum_{i = 1}^N L(x_i, y_i, z_i)$ $\textcolor{green}{E_{1-1}} = \displaystyle\frac {2}{N} \displaystyle\sum_{i = 1}^N L(x_i, y_i, z_i) y_i$ $\textcolor{green}{E_{10}} = \displaystyle\frac {2}{N} \displaystyle\sum_{i = 1}^N L(x_i, y_i, z_i) z_i$ $\textcolor{green}{E_{11}} = \displaystyle\frac {2}{N} \displaystyle\sum_{i = 1}^N L(x_i, y_i, z_i) x_i$
+
+那么在单位球上的光线表示为：`irradianceSH += SHL1rgb(rayRadiance, 2 * rayRadiance * rayDirection) / N`
+这就让我们发现了以下两点：
++ L0阶的球谐系数包含简单的平均辐射值
++ L1阶的球谐系数包含加权平均的辐射方向
+
+为了提高存储效率，可以将 L1 SH系数中公共的 L0 SH系数和常数2给提取出来，然后把 L1 存储的数据范围限制在 $[0, 1]$
++ `irradianceSH += SHL1rgb(rayRadiance, rayRadiance * rayDirection) / N`，把2给提出来
++ `irradianceSH.L1 /= irradiance.L0`，将 L1约掉 L0之后再存储
+
+那么我们在着色阶段重建 radiance 的时候也会很简单，直接把面法向量带进去即可：
+`result = (0.5 + dot(irradiance.L1, normal)) * irradiance.L0 * 2.0`
+有几个注意点：
++ 结果可能为负，因为 L1的值很是 L0的两倍
++ BRDF 里的 $\frac 1 \pi$ 我们已经在前面简化约分的时候用掉了
++ 也输出了缺少反射因子的反射光辐射值（radiance of reflected light）
 
 [Converting SH Radiance to Irradiance](https://grahamhazel.com/blog/2017/12/22/converting-sh-radiance-to-irradiance/)
 [baking artifact free lightmaps](https://ndotl.wordpress.com/2018/08/29/baking-artifact-free-lightmaps/)
