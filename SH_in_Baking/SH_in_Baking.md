@@ -1,12 +1,15 @@
 # SH in Baking
-*球谐函数在烘焙中的应用，默认已经了解球谐的基础了，简略了解球谐基础请点击[光照探针中的球谐基础](../LightProbe/LightProbe.md)*
 *If you can not render Mathematical formula, please read this [image_SH_in_Baking_md_to_png](./image_SH_in_Baking_md_to_png.png)*
+
+## 简介
+球谐函数是一种非常好的简化光照的数学模型，本文主要介绍我们为什么要在烘焙中使用球谐函数，以及我们在烘焙过程中如何计算球谐、如何简化计算过程。
+简略了解球谐基础请点击[光照探针中的球谐基础](../LightProbe/LightProbe.md)
 
 ## 目录
 + 为什么选用 SH 表示
 + 球谐辐照度函数
     + 烘焙球谐系数
-    + 简化
+    + 简化计算
 
 ## 为什么选用 SH
 ### 路径追踪表示的 Global Illumination
