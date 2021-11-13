@@ -6,10 +6,10 @@
 简略了解球谐基础请点击[光照探针中的球谐基础](../LightProbe/LightProbe.md)
 
 ## 目录
-+ 为什么选用 SH 表示
-+ 球谐辐照度函数
-    + 烘焙球谐系数
-    + 简化计算
++ [为什么选用 SH](#为什么选用-sh)
++ [球谐辐照度函数](#球谐辐照度函数)
+    + [烘焙球谐系数](#烘焙球谐系数)
+    + [简化计算](#简化计算)
 
 ## 为什么选用 SH
 ### 路径追踪表示的 Global Illumination
@@ -84,7 +84,7 @@ clamped cosine lobe 是 Lambertian BRDF中 lambert漫反射余弦值的球谐系
 
 这样所有的步骤我们都清晰了，现在可以得到辐照度的 L1阶球谐表示。
 
-### 简化
+### 简化计算
 我们可以把 `shEvaluateL1(vec3)` 和 `shApplyDiffuseConvolutionL1(SHL1&)` 做一个合并简化，得到：
 ```c++
 SHL1 shEvaluateDiffuseL1(vec3 p)

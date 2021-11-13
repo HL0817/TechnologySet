@@ -9,6 +9,8 @@
 + **已完成** 通用——作用 & 原理 & 实现方案
 + **未完成** 细节——Visibility & Interpolation & Light Grid
 ##### [SH in Baking](./SH_in_Baking/SH_in_Baking.md)
++ **已完成** 为什么选用 SH
++ **已完成** 球谐辐照度函数——烘焙球谐系数 & 简化计算
 ##### [GPU Driven Pipelines 研讨](./GPU_Driven_Pipelines/GPU_Driven_Pipelines.md)
 + **已完成** Mesh Cluster Rendering——Topic & Discussion
 + **已完成** Rendering Pipeline——Topic & Discussion
@@ -19,6 +21,7 @@
 ##### [SSAO](./SSAO/SSAO.md)
 + **已完成** SSAO——AO & SSAO基本原理
 + **未完成** 优化实现——HBAO & GTAO
+##### [光照模型简介](./Lighting_Model/Lighting_Model.md)
 
 ## doc
 *这里记录一些需要的资料*
