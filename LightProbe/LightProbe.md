@@ -15,7 +15,9 @@ If you can not render Mathematical formula, please read this [image_LightProbe_m
 
 ## 通用
 光照探针存储烘焙过程中生成的间接光信息，做为补充光源为场景的的对象提供光照效果，减小游戏运行时处理光照的压力。
+
 ![light_probe_generality](./images/light_probe_generality.jpg)
+
 ### 作用
 光照探针主要有两个用途：
 + 为场景中的动态对象提供提前生成的间接光：
@@ -92,7 +94,9 @@ If you can not render Mathematical formula, please read this [image_LightProbe_m
 
 我们把它写得简略一点可以得到：$f(\theta,\varphi) \approx aY_0^0 + bY_1^-1 + cY_1^0 + dY_1^1 + \cdot\cdot\cdot$
 看一下模拟效果：
+
 ![广义傅里叶展开-球谐模拟](./images/广义傅里叶展开-球谐模拟.jpg)
+
 现在让我们来认识一下探针数据形成的过程（烘焙计算的相关内容，这里简略说一下）：
 + 烘焙时我们使用蒙特卡洛采样（Monte Carlo Sampling）计算特定点的辐照度
 + 在球体上（或者光照贴图的半球）生成随机光线
@@ -100,32 +104,47 @@ If you can not render Mathematical formula, please read this [image_LightProbe_m
 
 至此，我们得到了一组球谐系数，用来表示辐照度函数。
 现在我们就可以使用球谐系数和正交基来求辐照度函数的近似结果了：
+
 ![reconstructing_SH](./images/reconstructing_SH.jpg)
+
 在着色阶段，我们根据方向（点的法线）解算就可以得到该点的辐照度了。
 
 ##### 常见探针插值
 探针数据是由球谐系数和正交基线性组合而成的（球谐系数在空间中是线性分布的），对探针进行插值可以被表示为对球谐系数进行插值：
+
 ![SH_interpolation](./images/SH_interpolation.jpg)
+
 这就导致一个问题，因为线性关系，探针数据所表示的间接光被认为是线性变化的光，那么用探针来模拟非线性衰弱的直接光（尤其是点光源这种），效果非常差
 
 交代过基础背景之后，让我们来看一下简单的插值策略：
 + Single Probe
     直接使用这个探针，不插值
+
     ![single_probe_interpolation](./images/single_probe_interpolation.jpg)
+
 + 1D Interpolation
     两个探针形成一个线段，按距离做线性插值
+
     ![1D_interpolation](./images/1D_interpolation.jpg)
+
 + 2D Interpolation
     三个探针为一组，三角形就按照重心坐标插值
+
     ![2D_interpolation](./images/2D_interpolation.jpg)
+
 + 3D Interpolation
     4个探针组合为四面体，也按照重心坐标插值
+
     ![3D_interpolation](./images/3D_interpolation.jpg)
+
 
 三角形和四面体的重心坐标插值如下（简单过一下，单独的插值章节再展开）：
 + 三角形重心坐标插值
+
     ![triangular_interpolation](./images/triangular_interpolation.jpg)
+
 + 四面体重心坐标插值
+
     ![tetrahedron_interpolation](./images/tetrahedron_interpolation.jpg)
 
 ## 细节

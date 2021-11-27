@@ -44,6 +44,7 @@
     >1986年，Kajiya统一了以前所有的光照模型，提出了Kajiya渲染方程。Kajiya首先提出了使用类似于随机采样的蒙特卡洛方法求解绘制方程的光线追踪算法，通过对到达图像平面上的光线路劲进行采样，然后估计它们对最终图像的贡献来生成图像。
 
     ![Kajiya_rendering_equation](./images/Kajiya_rendering_equation.png)
+
     $\LARGE L_o(x, \omega_o, \lambda, t) = L_e(x, \omega_o, \lambda, t) + \displaystyle\int_of_r(x, \omega_i, \omega_o, \lambda, t)L_i(x, \omega_i, \lambda, t)(\omega_i \cdot \mathbf{n})dw_i$
 
 ## 经典光照模型
@@ -103,6 +104,7 @@ Phong和Blinn-Phong模型区别不大，我这里将他们合起来将
 + $max((0, \mathbf{n} \cdot \mathbf{l})$，这里约束为非负数，因为 $\mathbf{n} \cdot \mathbf{l}$ 的结果为负表示光从下方射过来，这样对这个着色点完全没有贡献（不考虑折射）
 
 ![diffuse_coefficient](./images/diffuse_coefficient.png)
+
 这里就展示了，光照不变的情况下，漫反射系数越大那么物体就越亮
 
 #### 镜面反射光
@@ -114,6 +116,7 @@ Phong和Blinn-Phong模型区别不大，我这里将他们合起来将
 + 半程向量与法向越接近，表示镜面反射方向与观察方向越接近
 
 ![half_vector_near_normal](./images/half_vector_near_normal.png)
+
 + 镜面反射方向比较难求，但是半程向量非常好计算
 + 半程向量公式：$h = bisector(\mathbf{v}, \mathbf{l}) = \frac {\mathbf{v + l}} {||\mathbf{v + l}||}$
 

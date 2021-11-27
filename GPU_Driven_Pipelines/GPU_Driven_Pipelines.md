@@ -44,7 +44,9 @@ Mesh Cluster，网格块，指把一个模型以 cluster 为单位的进行细�
 我们通过 Mesh Cluster 能得到什么？
 + 一个 drawcall 画世界，可以使用一个 dc 绘制出任意数量的 meshes
 + 以 Cluster 的粒度（更小的粒度）进行GPU剔除
+
     ![mesh_cluster_occlusion_cull](./images/mesh_cluster_occlusion_cull.png)
+
 + 更快的顶点信息获取
 + 对 Cluster 进行深度排序
 + 使用 triangle strips 带来的问题
@@ -76,7 +78,9 @@ Mesh Cluster，网格块，指把一个模型以 cluster 为单位的进行细�
 
 ## Rendering pipeline
 ### Topic
+
 ![GPU_Driven_Pipeline](./images/GPU_Driven_Pipeline.png)
+
 整个管线被分为 CPU 阶段和 GPU 阶段
 这里简单说一下 CPU 的工作内容：
 + 视锥剔除（Frustum Culling)，剔除粒度应该是 Mesh 或者是 Instance
@@ -87,25 +91,35 @@ Mesh Cluster，网格块，指把一个模型以 cluster 为单位的进行细�
 
 接下来按步骤，细讲一下 GPU 的工作内容：
 + Instance Culling(Frustum/Occlusion)
+
     ![instance_culling](./images/instance_culling.png)
+
     根据缓冲区拿到的每个实例的信息（变换、边界等）做剔除（视锥和遮挡剔除），然后生成可见的 Chunk 列表
     *对于一个模型来说，以 64为固定大小的 Cluster应该粒度太小了，Chunk应该就是中间的层次结构，Mesh-Chunk-Cluster这样类似的层级结构*
 + Cluster Chunk Expansion
+
     ![cluster_chunk_expansion](./images/cluster_chunk_expansion.png)
+
     把 Chunk 列表给展开成 Cluster 列表
     *这里指出了为什么不能直接展开成 Cluster列表，而是要通过 Chunk做中转。一个 mesh可以分成的 Cluster太多（0-1000~），如果直接这样去让 GPU展开，那么 Cluster的数量对于 GPU的 wavefront来说，不能使线程间达到大致平衡（不同线程间差距过大，无法进行 GPU优化）。这里把中间层级约束到了 Chunk，最大可以包含 64个 Cluster。*
 + Cluster Culling
+
     ![cluster_culling](./images/cluster_culling.png)
+
     根据 Cluster的信息（变换、边界等）做剔除（视锥和遮挡剔除），然后为每个 Cluster计算三角形背面剔除掩码（采样预先烘焙好的根据方向计算的三角形背面遮挡数据），把 Cluster剔除信息和三角形背面剔除掩码传递到下一个阶段，做 indexbuffer 压缩。
     *这里的 Triangle Mask是三角形背面剔除的采样结果，我们预先将三角形各个方向的可见性做了烘焙处理，存进 Cluster的信息里面，这里计算当前这个方向是否为背面，然后写入掩码即可。后文会展示如何烘焙三角形背面数据。*
 + Index Buffer Compaction
+
     ![index_buffer_compaction](./images/index_buffer_compaction.png)
+
     Indexbuffer 是跟着 Drawcall 一起传入 GPU 中的，它记录了所有实例的下标，这里我们根据 Cluster剔除信息和三角形背面剔除掩码将已经被剔除的 Cluster的下标以及背面剔除的三角形的下标给删除掉，把 Indexbuffer 压缩到只含有需要绘制的三角形下标。
     这里有两个点比较特殊：
     + 被压缩的 Indexbuffer 比较小（小于8mb），这样会让我们不能一次性处理非常大的 renderpass，我们必须把它分成多个 pass 来进行。这意味着，Indexbuffer 的压缩和 multi-draw 是交替进行的，不会发生所有的 Indexbuffer压缩完成才进行绘制。
     + 一个 wavefront 只会处理一个 Cluster 的 Indexbuffer 压缩计算，每个线程也就只能处理一个单独的三角形，不会和其他 wavefront 和线程有耦合。
 + Multi-Draw
+
     ![multi_draw](./images/multi_draw.png)
+
     这里使用 MultiDrawIndexInstancedIndirect 来绘制前几个步骤生成的 drawcall组。
 
 ### Discussion
@@ -133,7 +147,9 @@ Mesh Cluster，网格块，指把一个模型以 cluster 为单位的进行细�
 *分享中讲了 ACU 的做法和结果，我这里讲一下本质的原理，以及他们是如何做简化和优化的*
 
 ### 原理
+
 ![triangle_backface_culling_spheremap](./images/triangle_backface_culling_spheremap.png)
+
 *找的网图，后面有时间可以重新画一个贴合场景的图*
 #### 烘焙计算的原理
 + 原点表示三角形的位置
@@ -177,24 +193,33 @@ f(x, y, z) =
 + Depth pre-pass，我们单独创建一个预计算 pass来生成遮挡深度图
     + 在这个 pass生成的遮挡深度图可以被后面 High-Z 和 Early-Z 使用
 + 选取一些好的遮挡物来生成本帧的深度遮挡图
+
     ![depth_for_selected_occluders](./images/depth_for_selected_occluders.png)
+
     + 有很多策略来选取好的遮挡物，ACU 这里采用最简单的基于距离的选择策略（因为时间原因，没有过多测试）
 + 将本帧深度遮挡图降采样到 $512 \times 256$
+
     ![downsample_depth](./images/downsample_depth.png)
+
 + 上一帧的深度图重投影（reprojection）到原来的 $\dfrac {1} {16}$分辨率
     + 不知道是当前 pass做重投影；还是之前就做好了重投影，这里直接使用
     + 为什么做重投影：降低上一帧的深度的分辨率，模糊上一帧的深度信息，这一帧去大概数据，抛弃完全准确的上一帧数据，降低计算量，忽略上一帧的某些准确信息（减少我们对这种准确而跟本帧冲突的数据）
 + 将本帧遮挡深度图和上一帧的重投影遮挡深度图做一个合并
     + 为什么做合并，本帧遮挡深度是选择部分模型来做遮挡物生成深度图，很可能旋转不连续有空洞产生（镜头的边缘也容易产生）
+
         ![holes_depth_for_selected_occluders](./images/holes_depth_for_selected_occluders.png)
+
     + 我们使用上一帧的深度重投影来填满这些空洞的地方
     + 上一帧的大型移动遮挡物可能会产生错误遮挡，我们会在重投影的过程中去掉相机附近遮挡来避免这种情况的发生
 + 我们把这个生成的遮挡深度图做一个分级(Depth Hierarchy)，作为后面 GPU剔除的依据（这里做mipmap？个人不确定）
+
     ![Hi_Z_depth](./images/Hi_Z_depth.png)
 
 #### 生成效率
 以 ACU 的典型场景为例，展示整个 pass的耗时
+
 ![typical_scene](./images/typical_scene.png)
+
 + 300 selected occluders 生成本帧遮挡深度图 **~600us**
 + 本帧深度遮挡图降采样到 $512 \times 256$ **100us**
 + 本帧深度遮挡图与上帧深度重投影图进行合并 **50us**
@@ -203,6 +228,7 @@ f(x, y, z) =
 可以看到这个 pass的主要步骤耗时不超过**1ms**
 
 #### Shadow Occlusion Depth Generation
+
 [Shadow Occlusion Depth Generation](#shadow-occlusion-depth-generation) 是 Occlusion Depth Generation 在阴影方面的应用，在后面展开
 
 ### Two-Phase Occlusion Culling
@@ -210,9 +236,13 @@ f(x, y, z) =
 + 只有一个遮挡剔除 pass
     + ACU 有两个 pass，prepass 生成遮挡深度，剔除 pass 做实际的剔除
     + RedLynx 的场景更多由小物体组成，不会有单个物体的大面积遮挡
+
     ![RedLynx_occlusion_scene](./images/RedLynx_occlusion_scene.png)
+
 + 基于 G-Buffer 深度数据生成一个遮挡深度锥体
+
     ![depth_pyramid](./images/depth_pyramid.png)
+
 + 深度遮挡锥是由 GCN HTILE min/max depth buffer 生成出来的
     + 比全分辨率递归采样生成快12倍
     + 这里没听说过 GCN HTILE min/max depth buffer，所以不会
@@ -221,7 +251,9 @@ f(x, y, z) =
     + 使用 gather4 指令，一次测试把4个遮挡物合在一起做遮挡剔除
 #### 执行流程
 让我们看一下具体的执行流程：
+
 ![two_phase_occlusion_culling](./images/two_phase_occlusion_culling.png)
+
 + 根据上一帧的遮挡深度锥体（depth pyramid）进行遮挡剔除，将没有被剔除的物体绘制出来
     + 这里的遮挡剔除分为两步
         + 粗粒度的视口剔除（viewport culling）和遮挡剔除，也就是以 object 为剔除粒度
@@ -245,10 +277,14 @@ f(x, y, z) =
 + Camera depth reprojection 生成遮挡深度 **~70us**
     + 重投影相机深度内的光源空间可能产生的阴影关系，由此生成阴影遮挡深度
     + 细节放到[Camera Dpeth Reprojection](#camera-depth-reprojection)中讨论
+
     ![depth_for_shadowmap](./images/depth_for_shadowmap.png)
+
 + 当前帧的阴影遮挡深度图与上一帧重投影低分辨深度图做合并
     + 大型快速移动的遮挡物可能会在这里造成错误（ACU 中并没有类似的遮挡物）
+
     ![combine_depthshadowmap_with_last_frame](./images/combine_depthshadowmap_with_last_frame.png)
+
 + 把这个生成的阴影遮挡深度图做一个分级(Depth Hierarchy)，作为后面 GPU剔除的依据（这里做mipmap？个人不确定）
     + 我不清楚这里为什么要做分级
     ![depthshadowmap_hierarchy](./images/depthshadowmap_hierarchy.png)
@@ -256,12 +292,18 @@ f(x, y, z) =
 ### Camera Depth Reprojection
 相机深度的光源空间重投影，目的是为了去掉被遮挡物的深度关系，后面在绘制阴影的时候并不关心这些被遮挡的物体是否处于阴影中
 + 我们不关注相机之外的对象，因此只会对视锥体内的对象做处理
+
     ![shadow_depth_in_frustum](./images/shadow_depth_in_frustum.png)
+
     红色的线是级联的范围
 + 我们也不关注被遮挡的对象，因此去掉被遮挡的对象
+
     ![shadow_depth_occlusion_cull](./images/shadow_depth_occlusion_cull.png)
+
 + 最终我们获得了视锥体内不被遮挡的对象的深度关系
+
     ![shadow_depth_in_frustum_without_occlusion](./images/shadow_depth_in_frustum_without_occlusion.png)
+    
     黄色区域就是相机深度内的遮挡关系，但是我们只关注当前级联内的物体，所以绿色块就是当前级联内的阴影最大深度
 
 ### 个人看法

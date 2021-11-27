@@ -14,7 +14,9 @@
 ## 为什么选用 SH
 ### 路径追踪表示的 Global Illumination
 先看一下全局光照（Global Illumination，后文简称 GI）在路径追踪里的表示：
+
 ![GI_in_path_tracing](./images/GI_in_path_tracing.png)
+
 我们在镜头里看见某一个位置 $x$ 的光照就像图中显示的一样，有许多来源，并且某些光源的路径比较复杂。
 我们尝试表示图中这个路径的光线：$L_o(x, \omega_o) = L_e(x) + \int_{\Omega}{L_i(x, \omega_i)f_r(x, \omega_o, \omega_i)(\omega_i \cdot n)d\omega_i}$
 有这样两个问题：
