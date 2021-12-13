@@ -95,7 +95,7 @@
 
     + Rain Texture 不平行于镜头，仰视天空会出现雨从四周向中间汇聚的现象，俯视大地会出现雨从中间往四周发散的现象【TODO：图片或者作图演示】
 + 不好让雨丝叠加方向风
-    + 最直观的场景就是，镜头朝着风的反方向看去，正常情况是雨往两边发散，这个方案无法模拟出来
+    + 最直观的场景就是，镜头朝着风的反方向看去，正常情况是雨往两边发散，仅适用面片无法模拟这个情况
     
     ![camera_lookat_the_the_oppsite_direction_of_the_wind_with_rain_texture](./images/camera_lookat_the_the_oppsite_direction_of_the_wind_with_rain_texture.png)
 
