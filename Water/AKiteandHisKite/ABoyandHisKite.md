@@ -147,3 +147,17 @@ water shader address:ABoyandHisKite\Content\KiteDemo\Environments\Materials\M_Ti
     + 根据深度判断是边缘还是岸边还是深度水
 
 ### specular
+
+
+
+
+
+# 临时记录
+[UE4 SingleLayerWater（文中简称水材质） 学习](https://zhuanlan.zhihu.com/p/373347686)
+[UE4风格化水体制作](https://blog.csdn.net/Dreammingsox/article/details/123619805?spm=1001.2101.3001.6650.7&utm_medium=distribute.pc_relevant.none-task-blog-2%7Edefault%7EBlogCommendFromBaidu%7Edefault-7-123619805-blog-122396884.pc_relevant_multi_platform_whitelistv1&depth_1-utm_source=distribute.pc_relevant.none-task-blog-2%7Edefault%7EBlogCommendFromBaidu%7Edefault-7-123619805-blog-122396884.pc_relevant_multi_platform_whitelistv1&utm_relevant_index=10)
+[UE4简单水体使用记录](https://blog.csdn.net/yycoolsam/article/details/122396884)
+[UE4基于物理的着色(二) 菲涅尔反射](https://zhuanlan.zhihu.com/p/159140434)
+[Adreno Profiler分析任意安卓游戏特效+抓取资源](https://qiankanglai.me/2015/05/16/Adreno-Profiler/)
+[Android抓帧](https://zhuanlan.zhihu.com/p/127993920)
+[如何查看安卓真机的渲染数据以及抓帧分析](https://blog.csdn.net/qq_37259196/article/details/115163405)
+[UE5RayTracing篇(1)——NSight Graphics](https://zhuanlan.zhihu.com/p/525830336)
