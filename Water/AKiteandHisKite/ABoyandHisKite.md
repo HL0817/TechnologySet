@@ -147,7 +147,14 @@ water shader address:ABoyandHisKite\Content\KiteDemo\Environments\Materials\M_Ti
     + 根据深度判断是边缘还是岸边还是深度水
 
 ### specular
+固定高光度，可调整高光颜色
+`specularColor = specular * SpecularColor.rgb * SpecularColor.a`
++ specular 先暂定为固定值（0.02 / 0.04）
++ SpecularColor：面板控制的高光基础色
 
+### wave
+
+### foam
 
 
 
