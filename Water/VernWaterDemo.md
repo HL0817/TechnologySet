@@ -59,7 +59,7 @@ $EP$ 还有一个特殊的物理意义，即水底反射的光线需要穿过水
 答：$PE$ 跟观察方向有关，观察角度一旦变化， $PE$ 的值变化比较剧烈，而 $BE$ 的变化就没有那么剧烈（除非水底高度变化较大）
 
 看一下我对深度的处理
-~~~hlsl
+```hlsl
 half GetWaterDepth(half pixelDepth, half2 screenUV, half3 worldPos)
 {
     // 相似三角形算当前着色点水面的近似深度
@@ -70,7 +70,7 @@ half GetWaterDepth(half pixelDepth, half2 screenUV, half3 worldPos)
     half waterCameraXZDistance = abs(_WorldSpaceCameraPos.y - worldPos.y);
     return waterCameraXZDistance * waterViewDepth / waterCameraDistance;
 }
-~~~
+```
 
 显然，图中可得 $\triangle BPE \sim \triangle CPD$ ，那么 $BE = \frac{CD}{CP} \cdot EP$
 
@@ -94,7 +94,7 @@ half GetWaterDepth(half pixelDepth, half2 screenUV, half3 worldPos)
 左边的法线分布较为平滑，没有尖锐的波形；右边的法线分布较为尖锐，分布不很平滑
 
 给出我对法线的处理
-~~~hlsl
+```hlsl
 // 高频法线
 half2 highFrequencyUV0 = (i.worldPos.xz + _HFNormal0TexPanner.xy * _Time.xx) * _HFNormal0TexPanner.zw;
 half2 highFrequencyUV1 = (i.worldPos.xz + _HFNormal1TexPanner.xy * _Time.xx) * _HFNormal1TexPanner.zw;
@@ -106,7 +106,7 @@ half3 lowFrequencyNormal = UnpackNormal(SAMPLE_TEXTURE2D(_LowFrequencyNormalTex,
 half3 N = (highFrequencyNormal0 + highFrequencyNormal1) + lowFrequencyNormal;
 
 N = normalize(WaterNormalT2W(N));
-~~~
+```
 
 需要两张法线贴图，一张高频和一张低频
 + 对高频法线，按照不同缩放和偏移做两次采样，得到两个方向不同、大小不同的两个法线分布
@@ -126,9 +126,70 @@ N = normalize(WaterNormalT2W(N));
 + 水体色：水体本身的颜色
 + 水雾色：水体色受到深度影响而累加（越深，水颜色越深）
 + 水底色：水底给一个假的固定色（光线穿过水体对水底造成的染色，会反过来影响水体本身的颜色显示，所有这里给一个固定的假的水底色来做对应的影响处理）
+
+水底色存在的意义就是，模拟水体对水底有光线相关的影响后，反射到水面的光线对水面颜色呈现的影响。看上去有点绕，简单说就是水体影响水底，水底影响水面，我们把这一过程给简化为一个简单的水底色。
+
+在我的实际处理中，用到了水体色和水底色混合得到水面的实际颜色，水雾色并没有直接使用。
+
+先看一下我的处理
+```hlsl
+half waterHeight = GetWaterDepth(i.viewDepth, screenUV, i.worldPos.xyz);
+half waterHeightFactor = waterHeight / _DepthMax;
+half colorMixFactor = saturate(pow(waterHeightFactor, 0.6));
+
+half3 waterColor = _WaterColor.rgb * _WaterColor.a;
+half3 underWaterColor = _UnderWaterColor.rgb * _UnderWaterColor.a;
+half3 baseColor = lerp(underWaterColor, waterColor, colorMixFactor);
+```
+
+`_DepthMax` 是我用来定义深水区域的，即水体深度决定水体色在水面颜色的占比
++ `waterHeight / _DepthMax > 1` ：水体深度超过 `_DepthMax` 就是深水区域，那么水面所呈现的颜色全部由水体色组成
++ `waterHeight / _DepthMax < 1` ：水体深度小于 `_DepthMax` 就是浅水区域，水体色的占比就由深度进行控制，越浅的水水体色占比就越小
+
+以这样的方式来代替水雾色的效果，达到水深颜色深的水雾效果
+
+按道理说，水底色也应该影响水底的颜色，但是为什么不用水底色去实际处理水底的颜色呢？
+答：但是水底色和水体色混合后为水面颜色，最终会和水底的颜色进行混合，所以水底色最终会影响水底的颜色
+
+看一下效果
++ 深水 `_DepthMax = 5.0`
+
+    ![water_color_depth_water](./images/water_color_depth_water.png)
+
++ 浅水 `_DepthMax = 0.1`
+
+    ![water_color_shallow_water](./images/water_color_shallow_water.png)
+
+
 ### 不透明度
+不透明度，很直观就是 $1 - alpha$ ，表示水体这个半透明物体与水底的颜色混合的最终混合比例
+
+看一下我的处理
+```hlsl
+half waterHeight = GetWaterDepth(i.viewDepth, screenUV, i.worldPos.xyz);
+half waterHeightFactor = waterHeight / _DepthMax;
+float fresnel = Fresnel(0.04, 5, NoV);
+half opacity = saturate(pow(waterHeightFactor, 0.2) + fresnel) * depthFade;
+```
+
+水体的透明度（不透明度）由两个基本项组成
++ 深度占比：这里表示水体深度在设置的最大深度的占比，深水区域应该就由完全看不到水底
++ 菲涅尔项：物理意义上的菲涅尔影响，角度对观察的影响，对水体来说会体现在透明度上
+
+对我的水体不透明度处理的说明
++ `0.04` 是光线在水体与空气两种介质的反射折射比率，是一个定值，不建议修改
++ `5` 是菲涅尔近似式子的标准乘方数，也不建议修改（或改为3）
++ [点击了解菲涅尔项](https://github.com/HL0817/Games101Notes/blob/main/Notes/17_Materials_and_Appearances/Materials_and_Appearances.md#%E8%8F%B2%E6%B6%85%E8%80%B3%E9%A1%B9)
+
+![water_opacity](./images/water_opacity.png)
+
+在基础说明中，不透明度的处理暂时到此为止，后续其他特性会对不透明度的使用和修改
+
+有个遗留问题，我直接将深度占比和菲涅尔项直接加起来作为水体的不透明度，但是感觉不太合理，暂时就这么处理吧
 
 ## 特性说明
+基础之外，就是给是加各种效果了，给水附加细节，细节拉满效果才能逼真一些
+
 ### 高光
 ### 假高光
 ### 天空盒反射
