@@ -1,5 +1,8 @@
 # Vern's Water Demo
 我（Vern LH 我的英文名）的水体基本结构说明
+给出两个引擎的版本
++ [Unity Shader address](./VernWaterDemo/VernWater.shader)
++ [UE Material Graph](./VernWaterDemo/Water_VernTest.uasset)
 
 ## 目录
 + [整体效果](#整体效果)
