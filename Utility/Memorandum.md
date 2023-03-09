@@ -30,3 +30,23 @@
 + Physical Based Lighting
     + [[UOD2022]气氛和调子-UE影调设计和实战解析 | Epic 李文磊](https://www.bilibili.com/video/BV1FD4y1x7RY/?spm_id_from=333.788&vd_source=ed25f8cd46af3af17726f30e1b36d673)
     + [自动曝光（眼部适应）](https://docs.unrealengine.com/4.27/zh-CN/RenderingAndGraphics/PostProcessEffects/AutomaticExposure/)
++ 局部天气系统扩充参数
++ 地表材质草扩充到静态模型材质
++ 游戏手机包打包
+
+### 3月
++ Grass Fire
+    + Fire BP chain
+        + Example_BP
+        + ExampleBurnSettingsInfo_BP
+        + FireStarter_BP
+        + FireStarterLimiter_BP
+        + BurningPreInstance_BP
+        + BurnGround_DECAL_BP
+        + Smoke_BP
+        + FireParticleMark_BP
+        + Fire_BP
+    + Grass Chunk
+        + ExampleGrassSpawnInfo_BP
+        + InteractiveFoliageChunk_BP
+        + INTERACTIVE_FoliageComp_BP
